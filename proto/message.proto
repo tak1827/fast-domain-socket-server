@@ -1,0 +1,22 @@
+syntax = "proto3";
+package angoya.stoserver.data;
+
+option go_package = "ithub.com/tak1827/fast-domain-socket-server/data";
+
+import "gogoproto/gogo.proto";
+
+option (gogoproto.gostring_all)             = true;
+option (gogoproto.goproto_stringer_all)     = false;
+option (gogoproto.stringer_all)             = true;
+option (gogoproto.marshaler_all)            = true;
+option (gogoproto.sizer_all)                = true;
+option (gogoproto.unmarshaler_all)          = true;
+option (gogoproto.equal_all)                = true;
+option (gogoproto.goproto_unkeyed_all)      = false;
+option (gogoproto.goproto_unrecognized_all) = false;
+option (gogoproto.goproto_sizecache_all)    = false;
+
+message Message {
+  string type    = 1;
+  string payload = 2;
+}
