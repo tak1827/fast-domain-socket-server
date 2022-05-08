@@ -22,6 +22,8 @@ const (
 )
 
 type Server struct {
+	sync.Mutex
+
 	addr           string
 	timeout        time.Duration
 	readBufferSize int
@@ -87,7 +89,9 @@ func (s *Server) Serve(ln net.Listener) error {
 			s.ErrCh <- err
 		}
 
+		s.Lock()
 		s.wg.Add(1)
+		s.Unlock()
 
 		go func() {
 			defer s.wg.Done()
@@ -113,7 +117,7 @@ func (s *Server) serveConn(conn net.Conn) (err error) {
 		return
 	}
 
-	fmt.Printf("Recieved: %v\n", tx)
+	// fmt.Printf("Recieved: %v\n", tx)
 
 	d, _ := tx.Marshal()
 

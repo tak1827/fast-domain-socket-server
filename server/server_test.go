@@ -1,20 +1,50 @@
 package server
 
 import (
+	"net"
 	"testing"
 	"time"
 
-	"go.uber.org/goleak"
 	"github.com/stretchr/testify/require"
+	"github.com/tak1827/fast-domain-socket-server/data"
+	"go.uber.org/goleak"
 )
+
+func client() (err error) {
+	var (
+		dst = make([]byte, 1024)
+		tx  = data.Message{
+			Type:    "type",
+			Payload: "palyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyad",
+		}
+	)
+	conn, err := net.Dial("unix", DefaultSockFilePath)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+
+	d, _ := tx.Marshal()
+	d = append(d, EOFByte)
+	if _, err = conn.Write(d); err != nil {
+		return
+	}
+
+	if dst, err = ReadConn(conn, dst); err != nil {
+		return
+	}
+
+	if err = tx.Unmarshal(dst); err != nil {
+		return
+	}
+
+	return
+}
 
 func TestShutdown(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
-	var (
-		s = NewServer(DefaultSockFilePath)
-	)
-
+	s := NewServer(DefaultSockFilePath)
 	ln, err := s.Listen()
 	require.NoError(t, err)
 
@@ -23,24 +53,45 @@ func TestShutdown(t *testing.T) {
 	}()
 
 	time.Sleep(1 * time.Second)
-
-
 	require.NoError(t, s.Shutdown(ln))
 }
 
-// func BenchmarkApply(b *testing.B) {
-// 	var (
-// 		now = time.Now()
-// 		name = "name"
-// 		email = "mail"
-// 		role = Admin
-// 	)
-// 	for n := 0; n < b.N; n++ {
-// 		user, err := NewBaseUser(name, email, role, now, now)
-// 		if err != nil {
-// 			b.Fatal(err)
-// 		}
-// 		email := user.Email()
-// 		user.SetName(email)
-// 	}
-// }
+func TestClient(t *testing.T) {
+	defer goleak.VerifyNone(t)
+
+	var (
+		s = NewServer(DefaultSockFilePath)
+	)
+	ln, err := s.Listen()
+	require.NoError(t, err)
+	defer s.Shutdown(ln)
+
+	go func() {
+		require.NoError(t, s.Serve(ln))
+	}()
+
+	for n := 0; n < 100; n++ {
+		go func() {
+			client()
+		}()
+	}
+}
+
+func BenchmarkServer(b *testing.B) {
+	var (
+		s = NewServer(DefaultSockFilePath)
+	)
+	ln, err := s.Listen()
+	require.NoError(b, err)
+	defer s.Shutdown(ln)
+
+	go func() {
+		require.NoError(b, s.Serve(ln))
+	}()
+
+	for n := 0; n < b.N; n++ {
+		if err = client(); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
