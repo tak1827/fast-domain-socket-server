@@ -10,13 +10,9 @@ import (
 	"go.uber.org/goleak"
 )
 
-func client() (err error) {
+func client(tx data.Message) (err error) {
 	var (
 		dst = make([]byte, 1024)
-		tx  = data.Message{
-			Type:    "type",
-			Payload: "palyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyad",
-		}
 	)
 	conn, err := net.Dial("unix", DefaultSockFilePath)
 	if err != nil {
@@ -60,7 +56,11 @@ func TestClient(t *testing.T) {
 	defer goleak.VerifyNone(t)
 
 	var (
-		s = NewServer(DefaultSockFilePath)
+		s  = NewServer(DefaultSockFilePath)
+		tx = data.Message{
+			Type:    "type",
+			Payload: "palyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyad",
+		}
 	)
 	ln, err := s.Listen()
 	require.NoError(t, err)
@@ -72,14 +72,18 @@ func TestClient(t *testing.T) {
 
 	for n := 0; n < 100; n++ {
 		go func() {
-			client()
+			client(tx)
 		}()
 	}
 }
 
 func BenchmarkServer(b *testing.B) {
 	var (
-		s = NewServer(DefaultSockFilePath)
+		s  = NewServer(DefaultSockFilePath)
+		tx = data.Message{
+			Type:    "type",
+			Payload: "palyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyadpalyad",
+		}
 	)
 	ln, err := s.Listen()
 	require.NoError(b, err)
@@ -90,7 +94,7 @@ func BenchmarkServer(b *testing.B) {
 	}()
 
 	for n := 0; n < b.N; n++ {
-		if err = client(); err != nil {
+		if err = client(tx); err != nil {
 			b.Fatal(err)
 		}
 	}

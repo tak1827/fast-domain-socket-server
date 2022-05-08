@@ -28,6 +28,7 @@ type Server struct {
 	timeout        time.Duration
 	readBufferSize int
 	wg             sync.WaitGroup
+	pool           sync.Pool
 
 	ErrCh chan error
 }
@@ -112,7 +113,14 @@ func (s *Server) serveConn(conn net.Conn) (err error) {
 		return
 	}
 
-	tx := data.Message{}
+	// tx := &data.Message{}
+	v := s.pool.Get()
+	if v == nil {
+		v = &data.Message{}
+	}
+	tx := v.(*data.Message)
+	defer s.pool.Put(tx)
+
 	if err = tx.Unmarshal(dst); err != nil {
 		return
 	}

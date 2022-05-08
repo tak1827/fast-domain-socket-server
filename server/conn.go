@@ -18,7 +18,7 @@ func ReadConn(conn net.Conn, dst []byte) ([]byte, error) {
 		n, err := conn.Read(dst)
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				return nil, nil
+				break
 			}
 			return nil, err
 		}
