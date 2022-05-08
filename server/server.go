@@ -13,13 +13,15 @@ import (
 )
 
 const (
-	DefaultSockFilePath = "../domain.sock"
-
 	EOFByte = 0x12 // -> same as "\n"
-
-	defaultReadBufferSize  = 4096
-	defaultWriteBufferSize = 4096
 )
+
+var (
+	ErrInvalidEOFByte = errors.New("invalid end of file byte")
+)
+
+type Handler func(tx *data.Message) ([]byte, error)
+type ErrHandler func(err error)
 
 type Server struct {
 	sync.Mutex
@@ -27,17 +29,31 @@ type Server struct {
 	addr           string
 	timeout        time.Duration
 	readBufferSize int
-	wg             sync.WaitGroup
-	pool           sync.Pool
 
-	ErrCh chan error
+	wg    sync.WaitGroup
+	pool  sync.Pool
+	errCh chan error
+
+	handler    Handler
+	errHandler ErrHandler
 }
 
-func NewServer(addr string) (s Server) {
+func NewServer(addr string, opts ...Option) (s Server) {
 	s.addr = addr
-	s.timeout = 3 * time.Second
-	s.readBufferSize = defaultReadBufferSize
-	s.ErrCh = make(chan error)
+	s.timeout = DefaultTimeout
+	s.readBufferSize = DefaultReadBufferSize
+	s.errCh = make(chan error)
+	s.handler = DefaultHandler
+	s.errHandler = DefaultErrHandler
+
+	if s.addr == "" {
+		s.addr = DefaultSockFilePath
+	}
+
+	for i := range opts {
+		opts[i].Apply(&s)
+	}
+
 	return
 }
 
@@ -59,19 +75,6 @@ func (s *Server) Listen() (net.Listener, error) {
 	return ln, nil
 }
 
-// func (s *Server) ListenAndServeUNIX() (err error) {
-// 	if err = removeSocketFile(s.addr); err != nil {
-// 		return
-// 	}
-// 	if s.ln, err = net.Listen("unix", s.addr); err != nil {
-// 		return
-// 	}
-// 	if err = os.Chmod(s.addr, 0700); err != nil {
-// 		return errors.Wrap(err, fmt.Sprintf("cannot chmod %s", s.addr))
-// 	}
-// 	return s.Serve()
-// }
-
 func (s *Server) Serve(ln net.Listener) error {
 	for {
 		conn, err := ln.Accept()
@@ -87,7 +90,7 @@ func (s *Server) Serve(ln net.Listener) error {
 		}
 
 		if err = conn.SetDeadline(time.Now().Add(s.timeout)); err != nil {
-			s.ErrCh <- err
+			return errors.Wrap(err, "failed to set deadline")
 		}
 
 		s.Lock()
@@ -98,7 +101,7 @@ func (s *Server) Serve(ln net.Listener) error {
 			defer s.wg.Done()
 
 			if err = s.serveConn(conn); err != nil && !errors.Is(err, io.EOF) {
-				s.ErrCh <- err
+				s.errCh <- err
 			}
 
 			conn.Close()
@@ -122,20 +125,15 @@ func (s *Server) serveConn(conn net.Conn) (err error) {
 	defer s.pool.Put(tx)
 
 	if err = tx.Unmarshal(dst); err != nil {
-		return
+		return errors.Wrap(err, fmt.Sprintf("failed to unmarshal packet(=%v)", dst))
 	}
 
-	// fmt.Printf("Recieved: %v\n", tx)
-
-	d, _ := tx.Marshal()
-
-	d = append(d, EOFByte)
-
-	if _, err = conn.Write(d); err != nil {
-		return
+	data, err := s.handler(tx)
+	if err != nil {
+		return errors.Wrap(err, "failed to handle")
 	}
 
-	return
+	return WriteConn(conn, data)
 }
 
 func (s *Server) Shutdown(ln net.Listener) (err error) {
@@ -149,7 +147,14 @@ func (s *Server) Shutdown(ln net.Listener) (err error) {
 		return
 	}
 
-	close(s.ErrCh)
+	close(s.errCh)
 
 	return
+}
+
+func removeSocketFile(path string) error {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return errors.Wrap(err, fmt.Sprintf("unexpected error when trying to remove unix socket file %q", path))
+	}
+	return nil
 }

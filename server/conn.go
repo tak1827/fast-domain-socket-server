@@ -51,6 +51,12 @@ func ReadConn(conn net.Conn, dst []byte) ([]byte, error) {
 	return dst[:size], nil
 }
 
+func WriteConn(conn net.Conn, data []byte) (err error) {
+	data = append(data, EOFByte)
+	_, err = conn.Write(data)
+	return
+}
+
 func isClosedConnError(err error) bool {
 	return strings.Contains(err.Error(), "use of closed network connection")
 }
