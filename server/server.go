@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	SockFilePath = "../domain.sock"
+	DefaultSockFilePath = "../domain.sock"
 
 	EOFByte = 0x12 // -> same as "\n"
 
@@ -25,7 +25,6 @@ type Server struct {
 	addr           string
 	timeout        time.Duration
 	readBufferSize int
-	ln             net.Listener
 	wg             sync.WaitGroup
 
 	ErrCh chan error
@@ -39,24 +38,45 @@ func NewServer(addr string) (s Server) {
 	return
 }
 
-func (s *Server) ListenAndServeUNIX() (err error) {
-	if err = removeSocketFile(s.addr); err != nil {
-		return
+func (s *Server) Listen() (net.Listener, error) {
+	err := removeSocketFile(s.addr)
+	if err != nil {
+		return nil, err
 	}
-	if s.ln, err = net.Listen("unix", s.addr); err != nil {
-		return
+
+	ln, err := net.Listen("unix", s.addr)
+	if err != nil {
+		return nil, err
 	}
+
 	if err = os.Chmod(s.addr, 0700); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("cannot chmod %s", s.addr))
+		return nil, errors.Wrap(err, fmt.Sprintf("cannot chmod %s", s.addr))
 	}
-	return s.Serve()
+
+	return ln, nil
 }
 
-func (s *Server) Serve() error {
+// func (s *Server) ListenAndServeUNIX() (err error) {
+// 	if err = removeSocketFile(s.addr); err != nil {
+// 		return
+// 	}
+// 	if s.ln, err = net.Listen("unix", s.addr); err != nil {
+// 		return
+// 	}
+// 	if err = os.Chmod(s.addr, 0700); err != nil {
+// 		return errors.Wrap(err, fmt.Sprintf("cannot chmod %s", s.addr))
+// 	}
+// 	return s.Serve()
+// }
+
+func (s *Server) Serve(ln net.Listener) error {
 	for {
-		conn, err := s.ln.Accept()
+		conn, err := ln.Accept()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			if isClosedConnError(err) {
 				return nil
 			}
 
@@ -64,7 +84,7 @@ func (s *Server) Serve() error {
 		}
 
 		if err = conn.SetDeadline(time.Now().Add(s.timeout)); err != nil {
-			return err
+			s.ErrCh <- err
 		}
 
 		s.wg.Add(1)
@@ -106,8 +126,8 @@ func (s *Server) serveConn(conn net.Conn) (err error) {
 	return
 }
 
-func (s *Server) Shutdown() (err error) {
-	if err = s.ln.Close(); err != nil {
+func (s *Server) Shutdown(ln net.Listener) (err error) {
+	if err = ln.Close(); err != nil {
 		return err
 	}
 
@@ -116,6 +136,8 @@ func (s *Server) Shutdown() (err error) {
 	if err = removeSocketFile(s.addr); err != nil {
 		return
 	}
+
+	close(s.ErrCh)
 
 	return
 }

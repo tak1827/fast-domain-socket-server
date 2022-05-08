@@ -3,6 +3,7 @@ package server
 import (
 	"io"
 	"net"
+	"strings"
 
 	"github.com/lithdew/bytesutil"
 	"github.com/pkg/errors"
@@ -48,4 +49,8 @@ func ReadConn(conn net.Conn, dst []byte) ([]byte, error) {
 	}
 
 	return dst[:size], nil
+}
+
+func isClosedConnError(err error) bool {
+	return strings.Contains(err.Error(), "use of closed network connection")
 }

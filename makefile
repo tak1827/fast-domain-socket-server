@@ -9,7 +9,7 @@ proto:
 		$(PROTO_SRC_FILES); \
 
 bench:
-	go test ./... -bench=. -benchtime=10s
+	go test ./... -bench=. -benchtime=1s -benchmem
 
 fmt:
 	go fmt ./...
@@ -17,3 +17,6 @@ fmt:
 lint:
 	go vet ./...
 
+.PHONY: test
+test:
+	MallocNanoZone=0 go test -race ./...
