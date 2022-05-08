@@ -18,6 +18,8 @@ const (
 
 var (
 	ErrInvalidEOFByte = errors.New("invalid end of file byte")
+
+	timeoutDuration time.Duration
 )
 
 type Handler func(tx *data.Message) ([]byte, error)
@@ -27,7 +29,7 @@ type Server struct {
 	sync.Mutex
 
 	addr           string
-	timeout        time.Duration
+	timeout        int64
 	readBufferSize int
 
 	wg    sync.WaitGroup
@@ -53,6 +55,8 @@ func NewServer(addr string, opts ...Option) (s Server) {
 	for i := range opts {
 		opts[i].Apply(&s)
 	}
+
+	timeoutDuration = time.Duration(time.Duration(s.timeout) * time.Second)
 
 	return
 }
@@ -89,7 +93,7 @@ func (s *Server) Serve(ln net.Listener) error {
 			return err
 		}
 
-		if err = conn.SetDeadline(time.Now().Add(s.timeout)); err != nil {
+		if err = conn.SetDeadline(time.Now().Add(timeoutDuration)); err != nil {
 			return errors.Wrap(err, "failed to set deadline")
 		}
 
