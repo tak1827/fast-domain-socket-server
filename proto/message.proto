@@ -1,7 +1,7 @@
 syntax = "proto3";
 package angoya.stoserver.data;
 
-option go_package = "ithub.com/tak1827/fast-domain-socket-server/data";
+option go_package = "github.com/tak1827/fast-domain-socket-server/data";
 
 import "gogoproto/gogo.proto";
 
