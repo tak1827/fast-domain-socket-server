@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"io"
 	"net"
 	"os"
@@ -73,7 +72,7 @@ func (s *Server) Listen() (net.Listener, error) {
 	}
 
 	if err = os.Chmod(s.addr, 0700); err != nil {
-		return nil, errors.Wrap(err, fmt.Sprintf("cannot chmod %s", s.addr))
+		return nil, errors.Wrapf(err, "cannot chmod %s", s.addr)
 	}
 
 	return ln, nil
@@ -120,7 +119,7 @@ func (s *Server) serveConn(conn net.Conn) (err error) {
 		return
 	}
 
-	// tx := &data.Message{}
+	// tx := data.Message{}
 	v := s.pool.Get()
 	if v == nil {
 		v = &data.Message{}
@@ -129,7 +128,7 @@ func (s *Server) serveConn(conn net.Conn) (err error) {
 	defer s.pool.Put(tx)
 
 	if err = tx.Unmarshal(dst); err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to unmarshal packet(=%v)", dst))
+		return errors.Wrapf(err, "failed to unmarshal packet(=%v)", dst)
 	}
 
 	data, err := s.handler(tx)
@@ -158,7 +157,7 @@ func (s *Server) Shutdown(ln net.Listener) (err error) {
 
 func removeSocketFile(path string) error {
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-		return errors.Wrap(err, fmt.Sprintf("unexpected error when trying to remove unix socket file %q", path))
+		return errors.Wrapf(err, "unexpected error when trying to remove unix socket file %q", path)
 	}
 	return nil
 }

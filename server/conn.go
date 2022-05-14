@@ -42,7 +42,11 @@ func ReadConn(conn net.Conn, dst []byte) ([]byte, error) {
 		break
 	}
 
-	size += 1 // increment one as EOFbyte
+	if size == 0 {
+		return nil, nil
+	}
+
+	size -= 1 // omit EOFbyte
 
 	if len(buf) != 0 {
 		return buf[:size], nil
