@@ -31,9 +31,8 @@ type Server struct {
 	timeout        int64
 	readBufferSize int
 
-	wg    sync.WaitGroup
-	pool  sync.Pool
-	errCh chan error
+	wg   sync.WaitGroup
+	pool sync.Pool
 
 	handler    Handler
 	errHandler ErrHandler
@@ -43,7 +42,6 @@ func NewServer(addr string, opts ...Option) (s Server) {
 	s.addr = addr
 	s.timeout = DefaultTimeout
 	s.readBufferSize = DefaultReadBufferSize
-	s.errCh = make(chan error)
 	s.handler = DefaultHandler
 	s.errHandler = DefaultErrHandler
 
@@ -104,7 +102,8 @@ func (s *Server) Serve(ln net.Listener) error {
 			defer s.wg.Done()
 
 			if err = s.serveConn(conn); err != nil && !errors.Is(err, io.EOF) {
-				s.errCh <- err
+				s.errHandler(err)
+				WriteConn(conn, []byte(err.Error()))
 			}
 
 			conn.Close()
@@ -149,8 +148,6 @@ func (s *Server) Shutdown(ln net.Listener) (err error) {
 	if err = removeSocketFile(s.addr); err != nil {
 		return
 	}
-
-	close(s.errCh)
 
 	return
 }
